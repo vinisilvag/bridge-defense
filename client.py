@@ -2,6 +2,8 @@
 import socket
 import json
 import sys
+import asyncio
+import time #para testes
 
 SHIPS_LP = {"frigate": 1, "destroyer": 2, "battleship": 3}
 
@@ -120,7 +122,7 @@ class BridgeDefense:
 
         # Se nenhum erro ocorrer, converte a resposta para JSON
 
-    def _authenticationRequest(self):
+    async def _authenticationRequest(self):
         """
         Recebe um GAS, envia para o servidor, que retorna autenticação.
         """
@@ -130,8 +132,7 @@ class BridgeDefense:
         jsonMessage = json.dumps(data)
 
         # Faz a autenticação nos quatro servidores (rios)
-        successfulAuthentication = True
-        for i in range(0, 4):
+        async def authenticate_server(i):
 
             # Recebe a resposta do servidor e transforma em um dicionário
             jsonResponse = self._serverCommunication(jsonMessage, i)
@@ -140,12 +141,15 @@ class BridgeDefense:
             # Retorna o status da autenticação em cada servidor (rio)
             if dictResponse["status"] == 0:
                 print(f"GAS autenticado no rio {i}")
-                successfulAuthentication = successfulAuthentication < True
+                return True
             else:
                 print(f"Não foi possivel autenticar GAS no rio {i}")
-                successfulAuthentication = successfulAuthentication < False
+                return False
+        # Executa as chamadas aos servidores em paralelo
+        tasks = [authenticate_server(i) for i in range(4)]
+        results = await asyncio.gather(*tasks)
         # Retorna True somente se a autenticação for bem sucedida em todos os servidores
-        return successfulAuthentication
+        return all(results)
 
     def _cannonPlacementRequest(self):
         data = {"type": "getcannons", "auth": self._gas}
@@ -158,7 +162,7 @@ class BridgeDefense:
         self._cannons = dictResponse["cannons"]
 
     def _turnStateRequest(self):
-        # Esse método é chamado a cada novo turno para saber quanis navios apareceram na entrada do rio
+        # Esse método é chamado a cada novo turno para saber quais navios apareceram na entrada do rio
         # Cada servidor controla um rio, então mandar requisição para os 4 servidores para reconstruir o estado do turno
         # Ideia: armazenar a posição e a vida dos navios na variável "__ships"
 
@@ -185,7 +189,7 @@ class BridgeDefense:
 
         # ETAPA1: Faz a autenticação nos 4 rios (já implementado)
         print("--------- INICIANDO AUTENTICAÇÃO ---------")
-        if not self._authenticationRequest():
+        if not asyncio.run(self._authenticationRequest()):
             print(
                 "Para continuar é preciso autenticar em todos os rios. Tente novamente."
             )
@@ -235,4 +239,16 @@ if __name__ == "__main__":
     # gas = "202011111122:1234567890:afc97aecb06dec27ded0534a4ceaf6aacb8c0291abd304ea708fc459ed0ac8eb+202011111123:1234567899:b7a40be27a38fd979186b0f7eeb45b706a2da859bba03f699d8cbf67b43d412e+0c2dc10ca2d44af785ddb45ad39c572c3754dcef38b1dc38b044a1ef002eece6"
 
     newGame = BridgeDefense(host, port, gas)
+    # Início da contagem de tempo
+    start_time = time.time()
+
+    # Executa a função _authenticationRequest
     newGame.playGame()
+
+    # Fim da contagem de tempo
+    end_time = time.time()
+
+    # Calcula o tempo decorrido
+    elapsed_time = end_time - start_time
+
+    print(f"Tempo decorrido: {elapsed_time} segundos")

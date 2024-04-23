@@ -12,7 +12,13 @@ class BridgeDefense:
         self._port1 = port1
         self._gas = gas
         self._currentTurn = 0
-        self._ships = []
+        # rivers x bridges
+        self._ships = [
+            [[], [], [], [], [], [], [], []],
+            [[], [], [], [], [], [], [], []],
+            [[], [], [], [], [], [], [], []],
+            [[], [], [], [], [], [], [], []],
+        ]
         self._cannons = []
 
     def __del__(self):
@@ -43,7 +49,7 @@ class BridgeDefense:
             print("Error:", e)
             sys.exit(0)
 
-    def _serverCommunication(self, jsonRequest, serverNum):
+    def _serverCommunication(self, jsonRequest, serverNum, turnRequest=False):
         """
         Administra a comunicação com o servidor.
 
@@ -64,38 +70,62 @@ class BridgeDefense:
                 with socket.socket(address_family, socket.SOCK_DGRAM) as client_socket:
 
                     # configura um timeout para não esperar indefinidamente
-                    client_socket.settimeout(5)
+                    client_socket.settimeout(0.5)
 
                     # Transforma e envia a mensagem para o servidor (para a porta indicada nos parâmetros)
                     client_socket.sendto(
                         jsonRequest.encode(), (ip_address, self._port1 + serverNum)
                     )
 
-                    # Recebe a resposta (com um tamanho máximo) e converte para JSON
-                    response, _ = client_socket.recvfrom(1024)
+                    if turnRequest:
+                        responses = []
 
-                    # Decodifica os bits da resposta do servidor
-                    response = response.decode()
+                        for _ in range(8):
+                            response, _ = client_socket.recvfrom(1024)
+                            response = response.decode()
+                            dictResponse = json.loads(response)
+                            if (
+                                dictResponse["type"] == "gameover"
+                                and dictResponse["status"] == 1
+                            ):
+                                print("JOGO ENCERRADO: " + dictResponse["description"])
+                                sys.exit(1)
+                            elif (
+                                dictResponse["type"] == "gameover"
+                                and dictResponse["status"] == 0
+                            ):
+                                print("JOGO ENCERRADO SEM NENHUM ERRO.")
+                                print(f"SCORE: {dictResponse['score']}")
+                                self._gameTerminationRequest()
+                                sys.exit(1)
+                            responses.append(dictResponse)
 
-                    # Verifica o tipo da mensagem para saber se é um game over ou não
-                    dictResponse = json.loads(response)
-                    if (
-                        dictResponse["type"] == "gameover"
-                        and dictResponse["status"] == 1
-                    ):
-                        print("JOGO ENCERRADO: " + dictResponse["description"])
-                        # sys.exit(1)
-                        return None
-                    elif (
-                        dictResponse["type"] == "gameover"
-                        and dictResponse["status"] == 0
-                    ):
-                        print("JOGO ENCERRADO SEM NENHUM ERRO.")
-                        # self._gameTerminationRequest()
-                        return None
+                        return responses
+                    else:
+                        # Recebe a resposta (com um tamanho máximo) e converte para JSON
+                        response, _ = client_socket.recvfrom(1024)
 
-                    # Se tudo ocorrer bem, retorna o JSON da resposta
-                    return response
+                        # Decodifica os bits da resposta do servidor
+                        response = response.decode()
+
+                        # Verifica o tipo da mensagem para saber se é um game over ou não
+                        dictResponse = json.loads(response)
+                        if (
+                            dictResponse["type"] == "gameover"
+                            and dictResponse["status"] == 1
+                        ):
+                            print("JOGO ENCERRADO: " + dictResponse["description"])
+                        elif (
+                            dictResponse["type"] == "gameover"
+                            and dictResponse["status"] == 0
+                        ):
+                            print("JOGO ENCERRADO SEM NENHUM ERRO.")
+                            print(f"SCORE: {dictResponse['score']}")
+                            self._gameTerminationRequest()
+                            sys.exit(1)
+
+                        # Se tudo ocorrer bem, retorna o JSON da resposta
+                        return response
 
             except socket.timeout:
 
@@ -158,16 +188,24 @@ class BridgeDefense:
         self._cannons = dictResponse["cannons"]
 
     def _turnStateRequest(self):
-        # Esse método é chamado a cada novo turno para saber quanis navios apareceram na entrada do rio
-        # Cada servidor controla um rio, então mandar requisição para os 4 servidores para reconstruir o estado do turno
-        # Ideia: armazenar a posição e a vida dos navios na variável "__ships"
+        data = {"type": "getturn", "auth": self._gas, "turn": self._currentTurn}
+        jsonMessage = json.dumps(data)
 
-        # self._currentTurn += 1
-        return
+        for i in range(4):
+            responses = self._serverCommunication(jsonMessage, i, turnRequest=True)
+            for bridge, response in enumerate(responses):
+                self._ships[i][bridge] = response["ships"]
+                for ship in self._ships[i][bridge]:
+                    ship["currentLifepoints"] = SHIPS_LP[ship["hull"]] - ship["hits"]
+
+        for row in self._ships:
+            print(row, end="\n")
+
+        self._currentTurn += 1
 
     def _shotMessage(self):
         shotResult = 1
-        #  A partir das variáveis "__ships" e "__cannons", que representam o turno atual,
+        # A partir das variáveis "__ships" e "__cannons", que representam o turno atual,
         #  desenvolver algoritmo para atirar nos navios possíveis
         #  a solução deve estar na documentação
         #  Obs.: Receber a confirmação do servidor antes de realmente decrementar a vida do navio
@@ -196,8 +234,6 @@ class BridgeDefense:
         print(f"Canhões: {self._cannons}")
 
         while True:
-            # ETAPA3: Avança um turno e reconstroi a posição dos navios (a implementar)
-            # desenvolver método "_turnStateRequest()"
             print("\n--------- AVANÇA TURNO E POSICIONA OS NAVIOS ---------")
             self._turnStateRequest()
 
@@ -206,7 +242,7 @@ class BridgeDefense:
             print("\n--------- ATIRANDO ---------")
 
             # Só pra facilitar no desenvolvimento
-            if self._currentTurn == 0:
+            if self._currentTurn == 2:
                 break
 
         # ETAPA5: Repete as etapas 4 e 5 até o fim do jogo (a implementar)

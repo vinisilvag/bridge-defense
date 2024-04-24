@@ -20,9 +20,11 @@ class BridgeDefense:
             [[], [], [], [], [], [], [], []],
         ]
         self._cannons = []
+        self._finished = False
 
     def __del__(self):
-        self._gameTerminationRequest()
+        if not self._finished:
+            self._gameTerminationRequest()
 
     def _get_ip_address(self):
         """
@@ -89,6 +91,7 @@ class BridgeDefense:
                                 and dictResponse["status"] == 1
                             ):
                                 print("JOGO ENCERRADO: " + dictResponse["description"])
+                                self._finished = True
                                 sys.exit(1)
                             elif (
                                 dictResponse["type"] == "gameover"
@@ -97,7 +100,8 @@ class BridgeDefense:
                                 print("JOGO ENCERRADO SEM NENHUM ERRO.")
                                 print(f"SCORE: {dictResponse['score']}")
                                 self._gameTerminationRequest()
-                                sys.exit(1)
+                                self._finished = True
+                                sys.exit(0)
                             responses.append(dictResponse)
 
                         return responses
@@ -115,6 +119,7 @@ class BridgeDefense:
                             and dictResponse["status"] == 1
                         ):
                             print("JOGO ENCERRADO: " + dictResponse["description"])
+                            self._finished = True
                         elif (
                             dictResponse["type"] == "gameover"
                             and dictResponse["status"] == 0
@@ -122,7 +127,8 @@ class BridgeDefense:
                             print("JOGO ENCERRADO SEM NENHUM ERRO.")
                             print(f"SCORE: {dictResponse['score']}")
                             self._gameTerminationRequest()
-                            sys.exit(1)
+                            self._finished = True
+                            sys.exit(0)
 
                         # Se tudo ocorrer bem, retorna o JSON da resposta
                         return response
@@ -234,7 +240,7 @@ class BridgeDefense:
         print(f"Canhões: {self._cannons}")
 
         while True:
-            print("\n--------- AVANÇA TURNO E POSICIONA OS NAVIOS ---------")
+            print(f"\n--------- TURNO {self._currentTurn} ---------")
             self._turnStateRequest()
 
             # ETAPA4: Atira nos navios da melhor forma possível (a implementar)

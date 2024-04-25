@@ -166,11 +166,59 @@ class BridgeDefense:
         return
 
     def _shotMessage(self):
-        shotResult = 1
-        #  A partir das variáveis "__ships" e "__cannons", que representam o turno atual,
-        #  desenvolver algoritmo para atirar nos navios possíveis
-        #  a solução deve estar na documentação
-        #  Obs.: Receber a confirmação do servidor antes de realmente decrementar a vida do navio
+        """
+            Atira nos melhores navios possíveis a partir das insformações
+            das variáveis "__ships" e "__cannons", que representam o turno atual.
+            A solução é especificada na documentação.
+        """
+        # ALGORITMO PARA DEFINIR EM QUE NAVIO OS CANHÕES DEVEM ATIRAR
+        for cannon in self._cannons:
+            print(f" Cannon in position {cannon} can hit:")
+        
+            # Adapta as posições de canhões às coerdenadas de navio
+            coordinate_x = cannon[1]-1
+            coordinate_y = cannon[0]-1  
+
+            # Obtém todos os navios ao alcance e adiciona em uma lista, e armazena as suas coordenadas
+            ships_in_range = []
+            for i in range(2):
+                if self._ships[coordinate_x+i][coordinate_y] is not None:
+                    ships = self._ships[coordinate_x+i][coordinate_y]
+                    # Armazena as coordenadas
+                    for ship in ships:
+                        ship['x_coordinate'] = coordinate_x+i
+                        ship['y_coordinate'] = coordinate_y
+                    ships_in_range.extend(self._ships[coordinate_x+i][coordinate_y])
+
+            # Calcula quantos tiros cada navio ainda precisa para afundar
+            hits_needed = {'frigate': 1, 'destroyer': 2, 'battleship': 3}
+            chosen_ship = {}
+            hits_to_sink_previous = 999
+            for ship in ships_in_range:
+                hull = ship['hull']
+                hits = ship['hits']
+                hits_to_sink = hits_needed[hull] - hits
+
+            # Escolhe o navio que precisa de menos tiros para afundar
+            if hits_to_sink < hits_to_sink_previous:
+                chosen_ship = ship
+                hits_to_sink_previous = hits_to_sink
+        
+            # Envia ao servidor a mensagem para atirar no navio escolhido
+            if chosen_ship.get('id') is not None:
+                shot_json_message = {
+                        "type": "shot",
+                        "auth": "ifs4:1:2c3b... +ifs4:2:cf87... +e51d06... ",
+                        "cannon": cannon,
+                        "id": chosen_ship.get("id")
+                        }
+                # Envia a mensagem
+                shotResult = self._serverCommunication(shot_json_message, chosen_ship.chosen_ship.get('x_coordinate'))
+                # Interpreta o resultado
+                if(shotResult.get("status") == 0):
+                    print(f"Canhão {shotResult.get('cannon')} atirou no navio {shotResult.get('id')} com sucesso!")
+                else:
+                    print(f"Canhão {shotResult.get('cannon')} tentou atirar no navio {shotResult.get('id')} e não conseguiu: {shotResult.get('description')}")
         return shotResult
 
     def _gameTerminationRequest(self):
@@ -180,8 +228,9 @@ class BridgeDefense:
         self._serverCommunication(jsonMessage, 0)
 
     def playGame(self):
-        # Único método visível para fora da classe
-        # Será usado para dar início ao jogo
+        """
+            Dá início ao jogo.
+        """
 
         # ETAPA1: Faz a autenticação nos 4 rios (já implementado)
         print("--------- INICIANDO AUTENTICAÇÃO ---------")
@@ -204,12 +253,13 @@ class BridgeDefense:
             # ETAPA4: Atira nos navios da melhor forma possível (a implementar)
             # desenvolver método "_shotMessage()"
             print("\n--------- ATIRANDO ---------")
+            self._shotMessage()
 
             # Só pra facilitar no desenvolvimento
             if self._currentTurn == 0:
                 break
 
-        # ETAPA5: Repete as etapas 4 e 5 até o fim do jogo (a implementar)
+        # ETAPA5: Repete as etapas 3 e 4 até o fim do jogo (a implementar)
 
         # ETAPA6: Retorna score
         return None

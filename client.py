@@ -64,15 +64,12 @@ class BridgeDefense:
         # Obtém endereço e família (IPv4 ou IPv6)
         ip_address, address_family = self._get_ip_address()
 
-        # Tenta enviar a mensagem 5 vezes
-        remaining_attempts = 5
-        while remaining_attempts > 0:
+        while True:
             try:
                 # Cria um socket UDP (e fecha a conexão automaticamente após as operações)
                 with socket.socket(address_family, socket.SOCK_DGRAM) as client_socket:
-
                     # configura um timeout para não esperar indefinidamente
-                    client_socket.settimeout(0.5)
+                    client_socket.settimeout(0.1)
 
                     # Transforma e envia a mensagem para o servidor (para a porta indicada nos parâmetros)
                     client_socket.sendto(
@@ -134,25 +131,11 @@ class BridgeDefense:
                         return response
 
             except socket.timeout:
-
-                remaining_attempts -= 1
-
-                if remaining_attempts == 0:
-                    print(
-                        "Não foi possíel se conectar com o servidor. Verifique sua conexão, o hostname e a porta."
-                    )
-                    return None
-                else:
-                    print(
-                        f"Ocorreu um timeout ao tentar conexão com o servidor {serverNum}. Tentando novamente..."
-                    )
-
+                print(
+                    f"Ocorreu um timeout ao tentar conexão com o servidor {serverNum}. Tentando novamente..."
+                )
             except socket.error as e:
-                if remaining_attempts == 0:
-                    print("Failure!")
-                    return None
                 print("An error occurred. Retrying... Socket error:", e)
-                remaining_attempts -= 1
 
         # Se nenhum erro ocorrer, converte a resposta para JSON
 

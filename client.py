@@ -180,15 +180,16 @@ class BridgeDefense:
             coordinate_y = cannon[0]-1  
 
             # Obtém todos os navios ao alcance e adiciona em uma lista, e armazena as suas coordenadas
+                # Get all ships in range and add to a list
+            ships_lists = self._ships + [[None] * len(self._ships[0])]
             ships_in_range = []
             for i in range(2):
-                if self._ships[coordinate_x+i][coordinate_y] is not None:
-                    ships = self._ships[coordinate_x+i][coordinate_y]
-                    # Armazena as coordenadas
+                if ships_lists[coordinate_x+i][coordinate_y] is not None:
+                    ships = ships_lists[coordinate_x+i][coordinate_y]
                     for ship in ships:
                         ship['x_coordinate'] = coordinate_x+i
                         ship['y_coordinate'] = coordinate_y
-                    ships_in_range.extend(self._ships[coordinate_x+i][coordinate_y])
+                    ships_in_range.extend(ships)
 
             # Calcula quantos tiros cada navio ainda precisa para afundar
             hits_needed = {'frigate': 1, 'destroyer': 2, 'battleship': 3}
@@ -199,10 +200,10 @@ class BridgeDefense:
                 hits = ship['hits']
                 hits_to_sink = hits_needed[hull] - hits
 
-            # Escolhe o navio que precisa de menos tiros para afundar
-            if hits_to_sink < hits_to_sink_previous:
-                chosen_ship = ship
-                hits_to_sink_previous = hits_to_sink
+                # Escolhe o navio que precisa de menos tiros para afundar
+                if hits_to_sink < hits_to_sink_previous and hits < hits_needed[hull]:
+                    chosen_ship = ship
+                    hits_to_sink_previous = hits_to_sink
         
             # Envia ao servidor a mensagem para atirar no navio escolhido
             if chosen_ship.get('id') is not None:
@@ -213,13 +214,28 @@ class BridgeDefense:
                         "id": chosen_ship.get("id")
                         }
                 # Envia a mensagem
-                shotResult = self._serverCommunication(shot_json_message, chosen_ship.chosen_ship.get('x_coordinate'))
-                # Interpreta o resultado
-                if(shotResult.get("status") == 0):
-                    print(f"Canhão {shotResult.get('cannon')} atirou no navio {shotResult.get('id')} com sucesso!")
+                shot_result = self._serverCommunication(shot_json_message, chosen_ship.chosen_ship.get('x_coordinate'))
+                
+                # Interpreta o resultado retornado pelo servidor
+                if(shot_result.get("status") == 0):
+                    
+                    # Mensagem de sucesso
+                    print(f"Canhão {shot_result.get('cannon')}" +
+                            f" atirou no navio {shot_result.get('id')} com sucesso!")
+                    
+                    # Atualiza localmente a quantidade de tiros tomados por um navio
+                    x = chosen_ship.get('x_coordinate')
+                    y = chosen_ship.get('y_coordinate')
+                    id = chosen_ship.get('id')
+                    for s in range(len(_ships[x][y])):
+                        if id == shot_result.get('id') and id == self._ships[x][y][s].get('id'):
+                            self._ships[x][y][s]['hits'] += 1
+                        
                 else:
-                    print(f"Canhão {shotResult.get('cannon')} tentou atirar no navio {shotResult.get('id')} e não conseguiu: {shotResult.get('description')}")
-        return shotResult
+                    # Informa o erro caso o tiro não tenha sido validado (mas o jogo continua normalmente)
+                    print(f"Canhão {shot_result.get('cannon')}" +
+                        " tentou atirar no navio {shot_result.get('id')}" +
+                        " e não conseguiu: {shot_result.get('description')}")
 
     def _gameTerminationRequest(self):
         data = {"type": "quit", "auth": self._gas}

@@ -193,12 +193,77 @@ class BridgeDefense:
         self._currentTurn += 1
 
     def _shotMessage(self):
-        shotResult = 1
-        # A partir das variáveis "__ships" e "__cannons", que representam o turno atual,
-        #  desenvolver algoritmo para atirar nos navios possíveis
-        #  a solução deve estar na documentação
-        #  Obs.: Receber a confirmação do servidor antes de realmente decrementar a vida do navio
-        return shotResult
+        """
+            Atira nos melhores navios possíveis a partir das insformações
+            das variáveis "__ships" e "__cannons", que representam o turno atual.
+            A solução é especificada na documentação.
+        """
+        # ALGORITMO PARA DEFINIR EM QUE NAVIO OS CANHÕES DEVEM ATIRAR
+        for cannon in self._cannons:
+            print(f" Cannon in position {cannon} can hit:")
+        
+            # Adapta as posições de canhões às coerdenadas de navio
+            coordinate_x = cannon[1]-1
+            coordinate_y = cannon[0]-1  
+
+            # Obtém todos os navios ao alcance e adiciona em uma lista, e armazena as suas coordenadas
+                # Get all ships in range and add to a list
+            ships_lists = self._ships + [[None] * len(self._ships[0])]
+            ships_in_range = []
+            for i in range(2):
+                if ships_lists[coordinate_x+i][coordinate_y] is not None:
+                    ships = ships_lists[coordinate_x+i][coordinate_y]
+                    for ship in ships:
+                        ship['x_coordinate'] = coordinate_x+i
+                        ship['y_coordinate'] = coordinate_y
+                    ships_in_range.extend(ships)
+
+            # Calcula quantos tiros cada navio ainda precisa para afundar
+            hits_needed = {'frigate': 1, 'destroyer': 2, 'battleship': 3}
+            chosen_ship = {}
+            hits_to_sink_previous = 999
+            for ship in ships_in_range:
+                hull = ship['hull']
+                hits = ship['hits']
+                hits_to_sink = hits_needed[hull] - hits
+
+                # Escolhe o navio que precisa de menos tiros para afundar
+                if hits_to_sink < hits_to_sink_previous and hits < hits_needed[hull]:
+                    chosen_ship = ship
+                    hits_to_sink_previous = hits_to_sink
+        
+            # Envia ao servidor a mensagem para atirar no navio escolhido
+            if chosen_ship.get('id') is not None:
+                shot_json_message = {
+                        "type": "shot",
+                        "auth": "ifs4:1:2c3b... +ifs4:2:cf87... +e51d06... ",
+                        "cannon": cannon,
+                        "id": chosen_ship.get("id")
+                        }
+                # Envia a mensagem
+                shot_result = self._serverCommunication(shot_json_message, chosen_ship.chosen_ship.get('x_coordinate'))
+                
+                # Interpreta o resultado retornado pelo servidor
+                if(shot_result.get("status") == 0):
+                    
+                    # Mensagem de sucesso
+                    print(f"Canhão {shot_result.get('cannon')}" +
+                            f" atirou no navio {shot_result.get('id')} com sucesso!")
+                    
+                    # Atualiza localmente a quantidade de tiros tomados por um navio
+                    x = chosen_ship.get('x_coordinate')
+                    y = chosen_ship.get('y_coordinate')
+                    id = chosen_ship.get('id')
+                    for s in range(len(_ships[x][y])):
+                        if id == shot_result.get('id') and id == self._ships[x][y][s].get('id'):
+                            self._ships[x][y][s]['hits'] += 1
+                        
+                else:
+                    # Informa o erro caso o tiro não tenha sido validado (mas o jogo continua normalmente)
+                    print(f"Canhão {shot_result.get('cannon')}" +
+                        " tentou atirar no navio {shot_result.get('id')}" +
+                        " e não conseguiu: {shot_result.get('description')}")
+
 
     def _gameTerminationRequest(self):
         data = {"type": "quit", "auth": self._gas}
@@ -207,8 +272,9 @@ class BridgeDefense:
         self._serverCommunication(jsonMessage, 0)
 
     def playGame(self):
-        # Único método visível para fora da classe
-        # Será usado para dar início ao jogo
+        """
+            Dá início ao jogo.
+        """
 
         # ETAPA1: Faz a autenticação nos 4 rios (já implementado)
         print("--------- INICIANDO AUTENTICAÇÃO ---------")
@@ -229,12 +295,13 @@ class BridgeDefense:
             # ETAPA4: Atira nos navios da melhor forma possível (a implementar)
             # desenvolver método "_shotMessage()"
             print("\n--------- ATIRANDO ---------")
+            self._shotMessage()
 
             # Só pra facilitar no desenvolvimento
             if self._currentTurn == 2:
                 break
 
-        # ETAPA5: Repete as etapas 4 e 5 até o fim do jogo (a implementar)
+        # ETAPA5: Repete as etapas 3 e 4 até o fim do jogo (a implementar)
 
         # ETAPA6: Retorna score
         return None

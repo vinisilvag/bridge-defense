@@ -3,9 +3,6 @@ import socket
 import json
 import sys
 
-SHIPS_LP = {"frigate": 1, "destroyer": 2, "battleship": 3}
-
-
 class BridgeDefense:
     def __init__(self, hostname, port1, gas):
         self._hostname = hostname
@@ -80,7 +77,7 @@ class BridgeDefense:
                         responses = []
 
                         for _ in range(8):
-                            response, _ = client_socket.recvfrom(1024)
+                            response, _ = client_socket.recvfrom(2048)
                             response = response.decode()
                             dictResponse = json.loads(response)
                             if (
@@ -104,7 +101,7 @@ class BridgeDefense:
                         return responses
                     else:
                         # Recebe a resposta (com um tamanho máximo) e converte para JSON
-                        response, _ = client_socket.recvfrom(1024)
+                        response, _ = client_socket.recvfrom(2048)
 
                         # Decodifica os bits da resposta do servidor
                         response = response.decode()
@@ -200,14 +197,11 @@ class BridgeDefense:
         """
         # ALGORITMO PARA DEFINIR EM QUE NAVIO OS CANHÕES DEVEM ATIRAR
         for cannon in self._cannons:
-            print(f" Cannon in position {cannon} can hit:")
-        
             # Adapta as posições de canhões às coerdenadas de navio
             coordinate_x = cannon[1]-1
             coordinate_y = cannon[0]-1  
 
             # Obtém todos os navios ao alcance e adiciona em uma lista, e armazena as suas coordenadas
-                # Get all ships in range and add to a list
             ships_lists = self._ships + [[None] * len(self._ships[0])]
             ships_in_range = []
             for i in range(2):
@@ -236,12 +230,13 @@ class BridgeDefense:
             if chosen_ship.get('id') is not None:
                 shot_json_message = {
                         "type": "shot",
-                        "auth": "ifs4:1:2c3b... +ifs4:2:cf87... +e51d06... ",
+                        "auth": gas,
                         "cannon": cannon,
-                        "id": chosen_ship.get("id")
+                        "id": chosen_ship["id"]
                         }
                 # Envia a mensagem
-                shot_result = self._serverCommunication(shot_json_message, chosen_ship.chosen_ship.get('x_coordinate'))
+                shot_result = self._serverCommunication(json.dumps(shot_json_message), chosen_ship["x_coordinate"])
+                shot_result = json.loads(shot_result)
                 
                 # Interpreta o resultado retornado pelo servidor
                 if(shot_result.get("status") == 0):
@@ -254,7 +249,7 @@ class BridgeDefense:
                     x = chosen_ship.get('x_coordinate')
                     y = chosen_ship.get('y_coordinate')
                     id = chosen_ship.get('id')
-                    for s in range(len(_ships[x][y])):
+                    for s in range(len(self._ships[x][y])):
                         if id == shot_result.get('id') and id == self._ships[x][y][s].get('id'):
                             self._ships[x][y][s]['hits'] += 1
                         
@@ -263,7 +258,6 @@ class BridgeDefense:
                     print(f"Canhão {shot_result.get('cannon')}" +
                         " tentou atirar no navio {shot_result.get('id')}" +
                         " e não conseguiu: {shot_result.get('description')}")
-
 
     def _gameTerminationRequest(self):
         data = {"type": "quit", "auth": self._gas}
@@ -275,8 +269,7 @@ class BridgeDefense:
         """
             Dá início ao jogo.
         """
-
-        # ETAPA1: Faz a autenticação nos 4 rios (já implementado)
+        # ETAPA1: Faz a autenticação nos 4 rios
         print("--------- INICIANDO AUTENTICAÇÃO ---------")
         if not self._authenticationRequest():
             print(
@@ -284,10 +277,12 @@ class BridgeDefense:
             )
             sys.exit(0)
 
+        # Armazena as posições dos canhões
         print("\n--------- RECEBENDO OS CANHÕES ---------")
         self._cannonPlacementRequest()
         print(f"Canhões: {self._cannons}")
 
+        # Avança turno e atira nos navios a cada turno (até o fim do jogo)
         while True:
             print(f"\n--------- TURNO {self._currentTurn} ---------")
             self._turnStateRequest()
@@ -298,10 +293,8 @@ class BridgeDefense:
             self._shotMessage()
 
             # Só pra facilitar no desenvolvimento
-            if self._currentTurn == 2:
-                break
-
-        # ETAPA5: Repete as etapas 3 e 4 até o fim do jogo (a implementar)
+            #if self._currentTurn == 10:
+            #    break
 
         # ETAPA6: Retorna score
         return None

@@ -183,12 +183,12 @@ class BridgeDefense:
         for i in range(4):
             responses = self._serverCommunication(jsonMessage, i, turnRequest=True)
             for bridge, response in enumerate(responses):
-                self._ships[i][bridge] = response["ships"]
-                for ship in self._ships[i][bridge]:
-                    ship["currentLifepoints"] = SHIPS_LP[ship["hull"]] - ship["hits"]
+                ships = response["ships"]
+                self._ships[i][bridge] = ships
 
-        for row in self._ships:
-            print(row, end="\n")
+                # Output dos turnos
+                for ship in ships:
+                   print(f"Navio {ship} no rio {i+1} ponte {bridge+1}.")
 
         self._currentTurn += 1
 

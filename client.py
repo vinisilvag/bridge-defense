@@ -2,6 +2,7 @@
 import socket
 import json
 import sys
+from threading import Thread
 
 SHIPS_LP = {"frigate": 1, "destroyer": 2, "battleship": 3}
 
@@ -69,7 +70,7 @@ class BridgeDefense:
                 # Cria um socket UDP (e fecha a conexão automaticamente após as operações)
                 with socket.socket(address_family, socket.SOCK_DGRAM) as client_socket:
                     # configura um timeout para não esperar indefinidamente
-                    client_socket.settimeout(0.1)
+                    client_socket.settimeout(0.2)
 
                     # Transforma e envia a mensagem para o servidor (para a porta indicada nos parâmetros)
                     client_socket.sendto(
@@ -145,13 +146,12 @@ class BridgeDefense:
         """
 
         # Transforma os dados necessários para esse tipo de requisição em um JSON
-        data = {"type": "authreq", "auth": self._gas}
-        jsonMessage = json.dumps(data)
+        jsonMessage = json.dumps({"type": "authreq", "auth": self._gas})
 
         # Faz a autenticação nos quatro servidores (rios)
-        successfulAuthentication = True
-        for i in range(0, 4):
+        successfulAuthentication = [False for i in range(4)]
 
+        def authenticate(i):
             # Recebe a resposta do servidor e transforma em um dicionário
             jsonResponse = self._serverCommunication(jsonMessage, i)
             dictResponse = json.loads(jsonResponse)
@@ -159,12 +159,20 @@ class BridgeDefense:
             # Retorna o status da autenticação em cada servidor (rio)
             if dictResponse["status"] == 0:
                 print(f"GAS autenticado no rio {i}")
-                successfulAuthentication = successfulAuthentication < True
+                successfulAuthentication[i] = True
             else:
                 print(f"Não foi possivel autenticar GAS no rio {i}")
-                successfulAuthentication = successfulAuthentication < False
+
+        threads = [Thread(target=authenticate, args=(i,)) for i in range(4)]
+
+        for t in threads:
+            t.start()
+
+        for t in threads:
+            t.join()
+
         # Retorna True somente se a autenticação for bem sucedida em todos os servidores
-        return successfulAuthentication
+        return all(success for success in successfulAuthentication)
 
     def _cannonPlacementRequest(self):
         data = {"type": "getcannons", "auth": self._gas}
@@ -177,15 +185,24 @@ class BridgeDefense:
         self._cannons = dictResponse["cannons"]
 
     def _turnStateRequest(self):
-        data = {"type": "getturn", "auth": self._gas, "turn": self._currentTurn}
-        jsonMessage = json.dumps(data)
+        jsonMessage = json.dumps(
+            {"type": "getturn", "auth": self._gas, "turn": self._currentTurn}
+        )
 
-        for i in range(4):
+        def requestAndUpdateState(i):
             responses = self._serverCommunication(jsonMessage, i, turnRequest=True)
             for bridge, response in enumerate(responses):
                 self._ships[i][bridge] = response["ships"]
                 for ship in self._ships[i][bridge]:
                     ship["currentLifepoints"] = SHIPS_LP[ship["hull"]] - ship["hits"]
+
+        threads = [Thread(target=requestAndUpdateState, args=(i,)) for i in range(4)]
+
+        for t in threads:
+            t.start()
+
+        for t in threads:
+            t.join()
 
         for row in self._ships:
             print(row, end="\n")
@@ -231,7 +248,7 @@ class BridgeDefense:
             print("\n--------- ATIRANDO ---------")
 
             # Só pra facilitar no desenvolvimento
-            if self._currentTurn == 2:
+            if self._currentTurn == 1:
                 break
 
         # ETAPA5: Repete as etapas 4 e 5 até o fim do jogo (a implementar)

@@ -36,13 +36,13 @@ class BridgeDefense:
             )
 
             # Itera sobre as informações
-            for family, socktype, proto, canonname, sockaddr in addr_info:
+            for family, _, _, _, sockaddr in addr_info:
                 ip_address = sockaddr[0]
                 # Escolhe endereço IPv6 se estiver disponível
                 if family == socket.AF_INET6:
                     return (ip_address, family)
             # Se não houver IPv6, escolhe IPv4
-            for family, socktype, proto, canonname, sockaddr in addr_info:
+            for family, _, _, _, sockaddr in addr_info:
                 ip_address = sockaddr[0]
                 if family == socket.AF_INET:
                     return (ip_address, family)
@@ -86,7 +86,10 @@ class BridgeDefense:
                                 dictResponse["type"] == "gameover"
                                 and dictResponse["status"] == 1
                             ):
-                                print("JOGO ENCERRADO: " + dictResponse["description"])
+                                print(
+                                    "JOGO ENCERRADO COM ERRO: "
+                                    + dictResponse["description"]
+                                )
                                 self._finished = True
                                 sys.exit(1)
                             elif (
@@ -114,8 +117,12 @@ class BridgeDefense:
                             dictResponse["type"] == "gameover"
                             and dictResponse["status"] == 1
                         ):
-                            print("JOGO ENCERRADO: " + dictResponse["description"])
+                            print(
+                                "JOGO ENCERRADO COM ERRO: "
+                                + dictResponse["description"]
+                            )
                             self._finished = True
+                            sys.exit(1)
                         elif (
                             dictResponse["type"] == "gameover"
                             and dictResponse["status"] == 0
@@ -147,9 +154,9 @@ class BridgeDefense:
         jsonMessage = json.dumps({"type": "authreq", "auth": self._gas})
 
         # Faz a autenticação nos quatro servidores (rios)
-        successfulAuthentication = True
-        for i in range(0, 4):
+        successfulAuthentication = [False for i in range(4)]
 
+        def authenticate(i):
             # Recebe a resposta do servidor e transforma em um dicionário
             jsonResponse = self._serverCommunication(jsonMessage, i)
             dictResponse = json.loads(jsonResponse)
@@ -157,12 +164,20 @@ class BridgeDefense:
             # Retorna o status da autenticação em cada servidor (rio)
             if dictResponse["status"] == 0:
                 print(f"GAS autenticado no rio {i}")
-                successfulAuthentication = successfulAuthentication < True
+                successfulAuthentication[i] = True
             else:
                 print(f"Não foi possivel autenticar GAS no rio {i}")
-                successfulAuthentication = successfulAuthentication < False
+
+        threads = [Thread(target=authenticate, args=(i,)) for i in range(4)]
+
+        for t in threads:
+            t.start()
+
+        for t in threads:
+            t.join()
+
         # Retorna True somente se a autenticação for bem sucedida em todos os servidores
-        return successfulAuthentication
+        return all(success for success in successfulAuthentication)
 
     def _cannonPlacementRequest(self):
         jsonMessage = json.dumps({"type": "getcannons", "auth": self._gas})
@@ -177,15 +192,22 @@ class BridgeDefense:
         data = {"type": "getturn", "auth": self._gas, "turn": self._currentTurn}
         jsonMessage = json.dumps(data)
 
-        for i in range(4):
+        def requestAndUpdateState(i):
             responses = self._serverCommunication(jsonMessage, i, turnRequest=True)
             for bridge, response in enumerate(responses):
                 ships = response["ships"]
                 self._ships[i][bridge] = ships
-
                 # Output dos turnos
                 for ship in ships:
                     print(f"Navio {ship} no rio {i+1} ponte {bridge+1}.")
+
+        threads = [Thread(target=requestAndUpdateState, args=(i,)) for i in range(4)]
+
+        for t in threads:
+            t.start()
+
+        for t in threads:
+            t.join()
 
         self._currentTurn += 1
 
@@ -294,8 +316,6 @@ class BridgeDefense:
             print(f"\n--------- TURNO {self._currentTurn} ---------")
             self._turnStateRequest()
 
-            # ETAPA4: Atira nos navios da melhor forma possível (a implementar)
-            # desenvolver método "_shotMessage()"
             print("\n--------- ATIRANDO ---------")
             self._shotMessage()
 

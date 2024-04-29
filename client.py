@@ -32,7 +32,7 @@ class BridgeDefense:
         try:
             # Obtém informações de endereço(s) para esse hostname (usando UDP)
             addr_info = socket.getaddrinfo(
-                self._hostname, self._port1, socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP
+                self._hostname, self._port1, 0, socket.SOCK_DGRAM
             )
 
             # Itera sobre as informações
@@ -68,7 +68,7 @@ class BridgeDefense:
                 # Cria um socket UDP (e fecha a conexão automaticamente após as operações)
                 with socket.socket(address_family, socket.SOCK_DGRAM) as client_socket:
                     # configura um timeout para não esperar indefinidamente
-                    client_socket.settimeout(1)
+                    client_socket.settimeout(0.6)
 
                     # Transforma e envia a mensagem para o servidor (para a porta indicada nos parâmetros)
                     client_socket.sendto(
@@ -316,12 +316,11 @@ class BridgeDefense:
             print(f"\n--------- TURNO {self._currentTurn} ---------")
             self._turnStateRequest()
 
+            if self._finished:
+                break
+
             print("\n--------- ATIRANDO ---------")
             self._shotMessage()
-
-            # Só pra facilitar no desenvolvimento
-            # if self._currentTurn == 2:
-            #     break
 
         return None
 

@@ -68,7 +68,7 @@ class BridgeDefense:
                 # Cria um socket UDP (e fecha a conexão automaticamente após as operações)
                 with socket.socket(address_family, socket.SOCK_DGRAM) as client_socket:
                     # configura um timeout para não esperar indefinidamente
-                    client_socket.settimeout(0.6)
+                    client_socket.settimeout(0.4)
 
                     # Transforma e envia a mensagem para o servidor (para a porta indicada nos parâmetros)
                     client_socket.sendto(

@@ -86,10 +86,7 @@ class BridgeDefense:
                                 dictResponse["type"] == "gameover"
                                 and dictResponse["status"] == 1
                             ):
-                                print(
-                                    "JOGO ENCERRADO COM ERRO: "
-                                    + dictResponse["description"]
-                                )
+                                print("JOGO ENCERRADO: " + dictResponse["description"])
                                 self._finished = True
                                 sys.exit(1)
                             elif (
@@ -117,10 +114,7 @@ class BridgeDefense:
                             dictResponse["type"] == "gameover"
                             and dictResponse["status"] == 1
                         ):
-                            print(
-                                "JOGO ENCERRADO COM ERRO: "
-                                + dictResponse["description"]
-                            )
+                            print("JOGO ENCERRADO: " + dictResponse["description"])
                             self._finished = True
                             sys.exit(1)
                         elif (
